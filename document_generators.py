@@ -6,14 +6,27 @@ from fpdf import FPDF
 from pptx import Presentation
 from pptx.util import Inches as PptxInches, Pt as PptxPt
 from pptx.dml.color import RGBColor as PptxRGBColor
+from pptx.enum.text import PP_ALIGN
+from pptx.enum.shapes import MSO_SHAPE
 
 
 def clean_markdown(text: str) -> str:
-    """Removes markdown symbols for plain-text formatting in docs/pptx/pdf."""
+    """Removes markdown symbols for plain-text formatting."""
     text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
     text = re.sub(r"\*(.*?)\*", r"\1", text)
     text = re.sub(r"#{1,6}\s?", "", text)
     return text.strip()
+
+
+def extract_paragraphs(text: str, max_items: int = 4) -> list:
+    """Splits markdown notes into substantive bullet points."""
+    cleaned = clean_markdown(text)
+    items = []
+    for line in cleaned.split("\n"):
+        line = line.strip()
+        if len(line) > 25 and not line.startswith("http"):
+            items.append(line)
+    return items[:max_items] if items else [cleaned[:250]]
 
 
 # -------------------------------------------------------------
@@ -22,31 +35,26 @@ def clean_markdown(text: str) -> str:
 def generate_word_document(topic: str, report: str, research_notes: str, analysis: str, sources: list) -> bytes:
     doc = Document()
 
-    # Document Header
     title = doc.add_heading("Comprehensive Research Briefing", level=0)
-    title.runs[0].font.color.rgb = RGBColor(20, 50, 90)
+    title.runs[0].font.color.rgb = RGBColor(15, 23, 42)
 
     p_topic = doc.add_paragraph()
     p_topic.add_run("Research Topic: ").bold = True
     p_topic.add_run(topic)
     doc.add_paragraph()
 
-    # Section 1: Final Report
     doc.add_heading("1. Executive Research Report", level=1)
     doc.add_paragraph(clean_markdown(report))
     doc.add_paragraph()
 
-    # Section 2: Analyst Insights
     doc.add_heading("2. Research Analyst's Insights", level=1)
     doc.add_paragraph(clean_markdown(analysis))
     doc.add_paragraph()
 
-    # Section 3: Research Findings / Scout Notes
     doc.add_heading("3. Raw Research Findings & Evidence", level=1)
     doc.add_paragraph(clean_markdown(research_notes))
     doc.add_paragraph()
 
-    # Section 4: Sources
     doc.add_heading("4. Verified Sources", level=1)
     for item in sources:
         title_text = item.get("title", "Source")
@@ -59,132 +67,104 @@ def generate_word_document(topic: str, report: str, research_notes: str, analysi
 
 
 # -------------------------------------------------------------
-# 2. POWERPOINT PRESENTATION GENERATOR (.pptx)
+# 2. EXECUTIVE CONSULTING-GRADE POWERPOINT (.pptx)
 # -------------------------------------------------------------
 def generate_pptx_deck(topic: str, report: str, analysis: str, sources: list) -> bytes:
     prs = Presentation()
-    # 16:9 widescreen
+    # 16:9 Modern Widescreen
     prs.slide_width = PptxInches(13.333)
     prs.slide_height = PptxInches(7.5)
 
     blank_layout = prs.slide_layouts[6]
 
-    def add_custom_slide(title_text: str, content_bullet_points: list):
-        slide = prs.slides.add_slide(blank_layout)
+    # Color Palette
+    NAVY = PptxRGBColor(15, 23, 42)        # #0F172A
+    CARD_BG = PptxRGBColor(241, 245, 249)  # #F1F5F9
+    ACCENT_BLUE = PptxRGBColor(37, 99, 235)# #2563EB
+    TEXT_DARK = PptxRGBColor(30, 41, 59)   # #1E293B
+    TEXT_MUTED = PptxRGBColor(100, 116, 139)# #64748B
+    WHITE = PptxRGBColor(255, 255, 255)
+    LIGHT_BORDER = PptxRGBColor(203, 213, 225)
 
-        # Slide Title
-        title_box = slide.shapes.add_textbox(PptxInches(1.0), PptxInches(0.8), PptxInches(11.33), PptxInches(1.0))
-        tf_title = title_box.text_frame
-        p_title = tf_title.paragraphs[0]
-        p_title.text = title_text
-        p_title.font.bold = True
-        p_title.font.size = PptxPt(32)
-        p_title.font.color.rgb = PptxRGBColor(24, 43, 73)
+    # ---------------------------------------------------------
+    # SLIDE 1: Premium Dark Hero Cover Slide
+    # ---------------------------------------------------------
+    s1 = prs.slides.add_slide(blank_layout)
+    bg1 = s1.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, PptxInches(13.333), PptxInches(7.5))
+    bg1.fill.solid()
+    bg1.fill.fore_color.rgb = NAVY
+    bg1.line.fill.background()
 
-        # Slide Content Box
-        body_box = slide.shapes.add_textbox(PptxInches(1.0), PptxInches(2.0), PptxInches(11.33), PptxInches(4.8))
-        tf_body = body_box.text_frame
-        tf_body.word_wrap = True
+    # Left Accent Bar
+    bar = s1.shapes.add_shape(MSO_SHAPE.RECTANGLE, PptxInches(1.0), PptxInches(1.8), PptxInches(0.12), PptxInches(3.8))
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = ACCENT_BLUE
+    bar.line.fill.background()
 
-        for i, point in enumerate(content_bullet_points):
-            p = tf_body.paragraphs[0] if i == 0 else tf_body.add_paragraph()
-            p.text = f"• {point.strip()}"
-            p.font.size = PptxPt(18)
-            p.font.color.rgb = PptxRGBColor(50, 50, 50)
-            p.space_after = PptxPt(14)
+    # Title & Subtitle Frame
+    t_box = s1.shapes.add_textbox(PptxInches(1.4), PptxInches(1.6), PptxInches(10.5), PptxInches(4.2))
+    tf1 = t_box.text_frame
+    tf1.word_wrap = True
 
-    # Slide 1: Title Slide
-    title_slide = prs.slides.add_slide(blank_layout)
-    box = title_slide.shapes.add_textbox(PptxInches(1.5), PptxInches(2.4), PptxInches(10.3), PptxInches(2.5))
-    tf = box.text_frame
-    p1 = tf.paragraphs[0]
-    p1.text = "Executive Research Briefing"
-    p1.font.bold = True
-    p1.font.size = PptxPt(40)
-    p1.font.color.rgb = PptxRGBColor(24, 43, 73)
+    tag_p = tf1.paragraphs[0]
+    tag_p.text = "EXECUTIVE STRATEGIC BRIEFING"
+    tag_p.font.size = PptxPt(12)
+    tag_p.font.bold = True
+    tag_p.font.color.rgb = ACCENT_BLUE
 
-    p2 = tf.add_paragraph()
-    p2.text = f"Topic: {topic}"
-    p2.font.size = PptxPt(22)
-    p2.font.color.rgb = PptxRGBColor(100, 100, 100)
-    p2.space_before = PptxPt(20)
+    title_p = tf1.add_paragraph()
+    title_p.text = topic.strip()
+    title_p.font.size = PptxPt(36)
+    title_p.font.bold = True
+    title_p.font.color.rgb = WHITE
+    title_p.space_before = PptxPt(12)
 
-    # Chunk clean texts into bullet points
-    def extract_bullets(text: str, max_points: int = 4):
-        cleaned = clean_markdown(text)
-        lines = [line.strip() for line in cleaned.split("\n") if len(line.strip()) > 25]
-        return lines[:max_points] if lines else [cleaned[:300]]
+    sub_p = tf1.add_paragraph()
+    sub_p.text = "Autonomous Intelligence & Strategic Synthesis Report | Multi-Agent Analysis"
+    sub_p.font.size = PptxPt(15)
+    sub_p.font.color.rgb = PptxRGBColor(148, 163, 184)
+    sub_p.space_before = PptxPt(16)
 
-    # Slide 2: Executive Summary & Core Insights
-    add_custom_slide("Executive Summary & Core Takeaways", extract_bullets(report, 4))
+    # ---------------------------------------------------------
+    # Helper: Consistent Light Slide Header
+    # ---------------------------------------------------------
+    def apply_slide_header(slide, title_text: str, subtitle_text: str):
+        box = slide.shapes.add_textbox(PptxInches(1.0), PptxInches(0.55), PptxInches(11.33), PptxInches(1.2))
+        tf = box.text_frame
+        p_sub = tf.paragraphs[0]
+        p_sub.text = subtitle_text.upper()
+        p_sub.font.size = PptxPt(10)
+        p_sub.font.bold = True
+        p_sub.font.color.rgb = ACCENT_BLUE
 
-    # Slide 3: Analyst Evaluation & Trends
-    add_custom_slide("Strategic Insights & Trends", extract_bullets(analysis, 4))
+        p_main = tf.add_paragraph()
+        p_main.text = title_text
+        p_main.font.size = PptxPt(26)
+        p_main.font.bold = True
+        p_main.font.color.rgb = NAVY
+        p_main.space_before = PptxPt(4)
 
-    # Slide 4: Citations & Evidence
-    source_lines = [
-        f"{item.get('title', 'Source')} ({item.get('link', '')})"
-        for item in sources[:4]
-    ]
-    add_custom_slide("Key Sources & References", source_lines if source_lines else ["Live Web Search Analysis"])
+    # ---------------------------------------------------------
+    # SLIDE 2: 3-Card Executive Summary Layout
+    # ---------------------------------------------------------
+    s2 = prs.slides.add_slide(blank_layout)
+    apply_slide_header(s2, "Executive Findings & Core Takeaways", "Key Synthesis")
 
-    buffer = io.BytesIO()
-    prs.save(buffer)
-    return buffer.getvalue()
+    bullets_report = extract_paragraphs(report, 3)
+    card_width = PptxInches(3.55)
+    card_height = PptxInches(4.8)
+    card_gap = PptxInches(0.34)
+    start_left = PptxInches(1.0)
+    card_top = PptxInches(1.9)
 
+    card_headers = ["Core Proposition", "Market Catalyst", "Strategic Outlook"]
 
-# -------------------------------------------------------------
-# 3. EXECUTIVE BRIEFING PDF GENERATOR (.pdf)
-# -------------------------------------------------------------
-def generate_pdf_report(topic: str, report: str, analysis: str) -> bytes:
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
+    for i in range(3):
+        c_left = start_left + i * (card_width + card_gap)
+        card = s2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, c_left, card_top, card_width, card_height)
+        card.fill.solid()
+        card.fill.fore_color.rgb = CARD_BG
+        card.line.color.rgb = LIGHT_BORDER
+        card.line.width = PptxPt(1)
 
-    # Header Title
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.set_text_color(24, 43, 73)
-    pdf.cell(0, 10, "Executive Research Presentation Report", ln=True)
-
-    pdf.set_font("Helvetica", "I", 11)
-    pdf.set_text_color(100, 100, 100)
-    topic_sanitized = topic.encode("latin-1", "replace").decode("latin-1")
-    pdf.cell(0, 8, f"Topic: {topic_sanitized}", ln=True)
-    pdf.ln(4)
-
-    # Separator
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(6)
-
-    # Section 1
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.set_text_color(24, 43, 73)
-    pdf.cell(0, 8, "1. Executive Briefing", ln=True)
-    pdf.ln(2)
-
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(40, 40, 40)
-    clean_rep = clean_markdown(report).encode("latin-1", "replace").decode("latin-1")
-    for line in clean_rep.split("\n"):
-        if line.strip():
-            pdf.multi_cell(0, 5, line.strip())
-            pdf.ln(2)
-
-    pdf.ln(4)
-
-    # Section 2
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.set_text_color(24, 43, 73)
-    pdf.cell(0, 8, "2. Strategic Analyst Evaluation", ln=True)
-    pdf.ln(2)
-
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(40, 40, 40)
-    clean_an = clean_markdown(analysis).encode("latin-1", "replace").decode("latin-1")
-    for line in clean_an.split("\n"):
-        if line.strip():
-            pdf.multi_cell(0, 5, line.strip())
-            pdf.ln(2)
-
-    return bytes(pdf.output())
+        t_box = s2.shapes.add_textbox(c_left + PptxInches(0.2), card_top + PptxInches(0.2), card_width - PptxInches(0.4), card
