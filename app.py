@@ -26,6 +26,10 @@ st.write(
     "**Researcher**, **Analyst**, and **Report Writer**."
 )
 
+# Initialize session state for persistent results across downloads
+if "research_data" not in st.session_state:
+    st.session_state["research_data"] = None
+
 topic = st.text_area(
     "Enter your research question",
     placeholder="Example: What is the impact of electric vehicles in India by 2030?",
@@ -107,69 +111,83 @@ if st.button("Run Research", type="primary"):
                 analysis=result["analysis"],
             )
 
+            # Save everything into session state to survive download button clicks
+            st.session_state["research_data"] = {
+                "topic": topic.strip(),
+                "result": result,
+                "word_bytes": word_bytes,
+                "pptx_bytes": pptx_bytes,
+                "pdf_bytes": pdf_bytes,
+            }
+
             progress_bar.progress(1.0)
             time.sleep(0.3)
             status_box.empty()
             progress_bar.empty()
 
-            st.success("Research and Presentation Files Ready!")
+# -------------------------------------------------------------
+# PERSISTENT DISPLAY SECTION (Stays visible across downloads)
+# -------------------------------------------------------------
+if st.session_state["research_data"]:
+    data = st.session_state["research_data"]
+    result = data["result"]
 
-            # -------------------------------------------------------------
-            # DOWNLOAD SECTION AT THE TOP
-            # -------------------------------------------------------------
-            st.markdown("### 📥 Download Presentation & Analysis Files")
-            col_word, col_pptx, col_pdf = st.columns(3)
+    st.success("Research and Presentation Files Ready!")
 
-            with col_word:
-                st.download_button(
-                    label="📄 Download Word File (.docx)",
-                    data=word_bytes,
-                    file_name="Research_Analysis_Complete.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    use_container_width=True,
-                )
-                st.caption("Includes all site data: Report, Analyst Insights, Notes & Sources.")
+    st.markdown("### 📥 Download Presentation & Analysis Files")
+    col_word, col_pptx, col_pdf = st.columns(3)
 
-            with col_pptx:
-                st.download_button(
-                    label="📊 Download PowerPoint (.pptx)",
-                    data=pptx_bytes,
-                    file_name="Presentation_Slides.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True,
-                )
-                st.caption("Slide deck ready for presentation.")
+    with col_word:
+        st.download_button(
+            label="📄 Download Word File (.docx)",
+            data=data["word_bytes"],
+            file_name="Research_Analysis_Complete.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+            key="btn_download_word",
+        )
+        st.caption("Includes all site data: Report, Analyst Insights, Notes & Sources.")
 
-            with col_pdf:
-                st.download_button(
-                    label="📑 Download Presentation PDF (.pdf)",
-                    data=pdf_bytes,
-                    file_name="Executive_Report.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                )
-                st.caption("Executive briefing PDF.")
+    with col_pptx:
+        st.download_button(
+            label="📊 Download PowerPoint (.pptx)",
+            data=data["pptx_bytes"],
+            file_name="Presentation_Slides.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            use_container_width=True,
+            key="btn_download_pptx",
+        )
+        st.caption("Slide deck ready for presentation.")
 
-            st.divider()
+    with col_pdf:
+        st.download_button(
+            label="📑 Download Presentation PDF (.pdf)",
+            data=data["pdf_bytes"],
+            file_name="Executive_Report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="btn_download_pdf",
+        )
+        st.caption("Executive briefing PDF.")
 
-            # -------------------------------------------------------------
-            # CONTENT VIEW AT THE BOTTOM
-            # -------------------------------------------------------------
-            st.subheader("Final Research Report")
-            st.markdown(result["report"])
+    st.divider()
 
-            st.subheader("Research Findings")
-            st.markdown(result["research_notes"])
+    # Content View remains intact on download
+    st.subheader("Final Research Report")
+    st.markdown(result["report"])
 
-            st.subheader("Analyst's Insights")
-            st.markdown(result["analysis"])
+    st.subheader("Research Findings")
+    st.markdown(result["research_notes"])
 
-            st.subheader("Sources")
-            for item in result["search_results"]:
-                title = item["title"]
-                link = item["link"]
+    st.subheader("Analyst's Insights")
+    st.markdown(result["analysis"])
 
-                if link:
-                    st.markdown(f"- [{title}]({link})")
-                else:
-                    st.markdown(f"- {title}")
+    st.subheader("Sources")
+    for item in result["search_results"]:
+        title = item["title"]
+        link = item["link"]
+
+        if link:
+            st.markdown(f"- [{title}]({link})")
+        else:
+            st.markdown(f"- {title}")
